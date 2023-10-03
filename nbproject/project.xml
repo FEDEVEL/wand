@@ -3,13 +3,9 @@
     <type>com.microchip.mplab.nbide.embedded.makeproject</type>
     <configuration>
         <data xmlns="http://www.netbeans.org/ns/make-project/1">
-            <name>Tiny - Simple</name>
-            <creation-uuid>d138ee89-32fa-4a3d-9099-6ab1ca5b3aeb</creation-uuid>
+            <name>wand</name>
+            <creation-uuid>b2e9096d-effb-4e90-893c-9fb347503fb2</creation-uuid>
             <make-project-type>0</make-project-type>
-            <c-extensions>c</c-extensions>
-            <cpp-extensions/>
-            <header-extensions>h</header-extensions>
-            <asminc-extensions/>
             <sourceEncoding>ISO-8859-1</sourceEncoding>
             <make-dep-projects/>
             <sourceRootList/>

@@ -13,12 +13,12 @@
   @Description:
     This header file provides implementations for driver APIs for all modules selected in the GUI.
     Generation Information :
-        Product Revision  :  PIC10 / PIC12 / PIC16 / PIC18 MCUs - 1.81.7
+        Product Revision  :  PIC10 / PIC12 / PIC16 / PIC18 MCUs - 1.81.8
         Device            :  PIC16LF1829
         Driver Version    :  2.00
     The generated drivers are tested against the following:
-        Compiler          :  XC8 2.31 and above or later
-        MPLAB             :  MPLAB X 5.45
+        Compiler          :  XC8 2.36 and above or later
+        MPLAB             :  MPLAB X 6.00
 */
 
 /*
@@ -52,14 +52,13 @@
 #include <stdint.h>
 #include <stdbool.h>
 #include <conio.h>
-#include "interrupt_manager.h"
 #include "i2c1_master.h"
 #include "tmr2.h"
 #include "pwm4.h"
 #include "epwm2.h"
 #include "epwm1.h"
+#include "eusart.h"
 #include "delay.h"
-#include "drivers/i2c_simple_master.h"
 
 
 

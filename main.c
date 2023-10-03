@@ -13,7 +13,7 @@
   Description:
     This header file provides implementations for driver APIs for all modules selected in the GUI.
     Generation Information :
-        Product Revision  :  PIC10 / PIC12 / PIC16 / PIC18 MCUs - 1.81.7
+        Product Revision  :  PIC10 / PIC12 / PIC16 / PIC18 MCUs - 1.81.8
         Device            :  PIC16LF1829
         Driver Version    :  2.00
 */
@@ -40,267 +40,147 @@
     OF FEES, IF ANY, THAT YOU HAVE PAID DIRECTLY TO MICROCHIP FOR THIS 
     SOFTWARE.
 */
+
 #include "mcc_generated_files/mcc.h"
 #include "mcc_generated_files/examples/i2c1_master_example.h"
 
 #define KXTJ3_I2C_ADDR 0x0E
+#define KXTJ3_WHO_AM_I 0x0F
 
-void WakeUpInterrupt(void);
-void ButtonInterrupt(void);
-void TimerInterrupt(void);
+#define X 0
+#define Y 1
+#define Z 2
 
-int8_t moves[4];
-int8_t part = 1;
-
-//extern uint8_t intensity_red = 0;
-//extern uint8_t intensity_green = 0;
-//extern uint8_t intensity_blue = 0;
-
-//Absolute Value function
-int8_t mathAbs(int8_t num){
-    if(num > 0)
-        return num;
-    else if(num < 0)
-        return -num;
-    else
-        return 0;
-}
-
-int8_t mathSign(int8_t num){
-    if(num > 0)
-        return 1;
-    else if(num < 0)
-        return -1;
-    else
-        return 0;
-}
-
-int8_t mathMin(int8_t n, int8_t m){
-    if(n > m){
-        return m;
-    }else{
-        return n;
-    }
-}
-
-//Simple LED effect
-void patronus(void)
-{
-    EPWM1_LoadDutyValue(0); //BLUE
-    EPWM2_LoadDutyValue(0); //RED
-    PWM4_LoadDutyValue(0); //GREEN
-    
-    uint8_t i;
-    
-    //start with blue
-    for (i=0;i<20;i++)
-    {
-        EPWM1_LoadDutyValue(i);
-        DELAY_milliseconds(100);
-    }
-    
-    //change to white
-    for (i=0;i<20;i++)
-    {
-        EPWM2_LoadDutyValue(i);
-        PWM4_LoadDutyValue(i);
-        DELAY_milliseconds(100);
-    }      
-    
-    //go to the full white intensity
-    for (i=20;i<100;i++)
-    {
-        EPWM1_LoadDutyValue(i); //BLUE
-        EPWM2_LoadDutyValue(i); //RED
-        PWM4_LoadDutyValue(i); //GREEN 
-        DELAY_milliseconds(10);
-    }    
-    
-    DELAY_milliseconds(3000); //full brightness for 3s
-    
-    //slowly turn off the LEDs
-    for (i=100;i>1;i--)
-    {
-        EPWM1_LoadDutyValue(i); //BLUE
-        EPWM2_LoadDutyValue(i); //RED
-        PWM4_LoadDutyValue(i); //GREEN 
-        DELAY_milliseconds(10);
-    }        
-    EPWM1_LoadDutyValue(0); //BLUE
-    EPWM2_LoadDutyValue(0); //RED
-    PWM4_LoadDutyValue(0); //GREEN    
-}
-
-void lumos(){
-    int8_t on = 1;
-    EPWM1_LoadDutyValue(10); //B
-    EPWM2_LoadDutyValue(100); //R
-    PWM4_LoadDutyValue(85);
-    DELAY_milliseconds(100);
-    int8_t previous = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x09);
-    while(on){
-        
-        
-        if(mathAbs(I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x09)-previous) > 20){
-            on = 0;
+char detectMovementDirection(int8_t axis[], int8_t prev_axis[]) {
+    //If there is more movement in Y axis (tilt), detect Up or Down tilt
+    if ((abs(axis[Y] - prev_axis[Y])) > (abs(axis[X] - prev_axis[X]))) {
+        if ((axis[Y] > prev_axis[Y]) && (abs(axis[Y] - prev_axis[Y]) > 10)) {
+            return 'U';
         }
-        /*
-        previous = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x09);
-        
-        //printf("Hi");
-        int8_t tmp = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x07);
-        //printf("%04d \n\r", tmp);
-        //printf("%04d \n\r", tmp/2);
-        //tmp = tmp+1;
-        //printf(tmp);
-        //printf(tmp+1);
-        //printf("%04d %04d %04d \n\r", 10 + tmp*0.1, 80 + tmp, 65 + tmp*0.8);
-        
-        EPWM1_LoadDutyValue(10 + (I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x07))*0.1); //B
-        EPWM2_LoadDutyValue(80 + (I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x07))); //R
-        PWM4_LoadDutyValue(65 + (I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x07))*0.8);
-        */
-        
-        //Full light, yellowish
-        EPWM1_LoadDutyValue(11); //B
-        EPWM2_LoadDutyValue(160); //R
-        PWM4_LoadDutyValue(160);
+        if ((axis[Y] < prev_axis[Y]) && (abs(axis[Y] - prev_axis[Y]) > 10)) {
+            return 'D';
+        }
     }
-    
+    //If there is more movement in X axis (roll), detect Left or Right roll
+    else if ((abs(axis[Y] - prev_axis[Y])) < (abs(axis[X] - prev_axis[X]))) {
+        if ((axis[X] > prev_axis[X]) && (axis[Z] < prev_axis[Z]) && (abs(axis[X] - prev_axis[X]) > 25)) {
+            return 'L';
+        }
+        if ((axis[X] < prev_axis[X]) && (axis[Z] < prev_axis[Z]) && (abs(axis[X] - prev_axis[X]) > 25)) {
+            return 'R';
+        }
+    }
+    //If there is not enough movement, fill sequence with empty "X"
+    return 'X';
 }
 
-void lightsOff(){
+void lumos() {
+    printf("\n\r LUMOS \n\r");
+    //Turn on yellowish light
+    EPWM1_LoadDutyValue(15); //B
+    EPWM2_LoadDutyValue(160); //R
+    PWM4_LoadDutyValue(160); //G
+}
+
+void nox() {
+    printf("\n\r NOX \n\r");
+    //Turn off lumos light
     EPWM1_LoadDutyValue(0); //B
     EPWM2_LoadDutyValue(0); //R
-    PWM4_LoadDutyValue(0);
+    PWM4_LoadDutyValue(0); //G
 }
 
-void flashRED()
-{
-    uint8_t i; 
-    EPWM2_LoadDutyValue(160); //RED
-    DELAY_milliseconds(100);
-    for (i=20;i>0;i--)
-    {
-        EPWM2_LoadDutyValue(i); //RED
-        DELAY_milliseconds(1);
-    }    
-    lightsOff(); 
+void dark_magic_enter() {
+    printf("\n\r DARK MAGIC STATE \n\r");
+    //Turn on red glow
+    EPWM1_LoadDutyValue(0); //B
+    EPWM2_LoadDutyValue(10); //R
+    PWM4_LoadDutyValue(0); //G
 }
 
-void flashWhite()
-{
-    uint8_t i; 
+void expecto_patronum() {
+    printf("\n\r EXPECTO PATRONUM \n\r");
+    DELAY_milliseconds(1000);
+    //Turn on blue glow
+    EPWM1_LoadDutyValue(20); //B
+    EPWM2_LoadDutyValue(0); //R
+    PWM4_LoadDutyValue(0); //G
+    DELAY_milliseconds(200);
+    EPWM1_LoadDutyValue(0); //B
+    EPWM2_LoadDutyValue(0); //R
+    PWM4_LoadDutyValue(0); //G
+    DELAY_milliseconds(200);
+    EPWM1_LoadDutyValue(80); //B
+    EPWM2_LoadDutyValue(0); //R
+    PWM4_LoadDutyValue(0); //G
+    DELAY_milliseconds(200);
+    EPWM1_LoadDutyValue(0); //B
+    EPWM2_LoadDutyValue(0); //R
+    PWM4_LoadDutyValue(0); //G
+    DELAY_milliseconds(200);
     EPWM1_LoadDutyValue(160); //B
-    EPWM2_LoadDutyValue(160); //R
-    PWM4_LoadDutyValue(160);
-    DELAY_milliseconds(100);
-    for (i=20;i>0;i--)
-    {
-        EPWM1_LoadDutyValue(i); //B
-        EPWM2_LoadDutyValue(i); //R
-        PWM4_LoadDutyValue(i);
-        DELAY_milliseconds(1);
-    }    
-    lightsOff(); 
+    EPWM2_LoadDutyValue(10); //R
+    PWM4_LoadDutyValue(10); //G
+    DELAY_milliseconds(4000);
+    EPWM1_LoadDutyValue(0); //B
+    EPWM2_LoadDutyValue(0); //R
+    PWM4_LoadDutyValue(0); //G
 }
 
-void sparks(){
-    
-    uint8_t i;    
-    
-    //go to the full white intensity
-    /*for (i=0;i<50;i++)
-    {
-        EPWM1_LoadDutyValue(i); //BLUE
-        EPWM2_LoadDutyValue(i+10); //RED
-        PWM4_LoadDutyValue(i); //GREEN 
-        DELAY_milliseconds(30);
-    }  */
-    
-    /*
-    for (i=0;i<50;i+=2)
-    {
-        EPWM1_LoadDutyValue(50-i); //BLUE
-        EPWM2_LoadDutyValue(i+60); //RED
-        PWM4_LoadDutyValue(50-i); //GREEN 
-        DELAY_milliseconds(40);
-    }
-     */
-    
-    lightsOff();
-    
-    for (i=0;i<160;i++)
-    {
-        EPWM2_LoadDutyValue(i); //RED
-        DELAY_milliseconds(10);
-    }  
-  
-    lightsOff();
-    DELAY_milliseconds(400);     
+void avada_kedavra() {
+    printf("\n\r AVADA KEDAVRA \n\r");
+    //Turn on green glow
+    EPWM1_LoadDutyValue(0); //B
+    EPWM2_LoadDutyValue(0); //R
+    PWM4_LoadDutyValue(20); //G
+    DELAY_milliseconds(300);
+    EPWM1_LoadDutyValue(0); //B
+    EPWM2_LoadDutyValue(0); //R
+    PWM4_LoadDutyValue(40); //G
+    DELAY_milliseconds(300);
+    EPWM1_LoadDutyValue(0); //B
+    EPWM2_LoadDutyValue(0); //R
+    PWM4_LoadDutyValue(60); //G
+    DELAY_milliseconds(300);
+    EPWM1_LoadDutyValue(0); //B
+    EPWM2_LoadDutyValue(0); //R
+    PWM4_LoadDutyValue(80); //G
+    DELAY_milliseconds(300);
+    EPWM1_LoadDutyValue(0); //B
+    EPWM2_LoadDutyValue(0); //R
+    PWM4_LoadDutyValue(160); //G
+    DELAY_milliseconds(2500);
+    EPWM1_LoadDutyValue(0); //B
+    EPWM2_LoadDutyValue(10); //R
+    PWM4_LoadDutyValue(0); //G
+}
 
-    flashRED(); 
-    DELAY_milliseconds(400); 
-    
-    flashRED(); 
-    DELAY_milliseconds(50); 
-    
-    flashRED(); 
-    DELAY_milliseconds(50); 
-    
-    flashRED(); 
-    DELAY_milliseconds(300); 
-    
-    flashRED(); 
-    DELAY_milliseconds(20); 
-    
-    flashRED(); 
-    DELAY_milliseconds(20); 
-    
-    flashRED(); 
-    DELAY_milliseconds(20); 
-    
-    flashRED(); 
-    DELAY_milliseconds(100); 
-    
-    flashRED(); 
-    DELAY_milliseconds(20); 
-    
-    flashRED(); 
-    DELAY_milliseconds(20); 
-    
-    flashRED(); 
-    DELAY_milliseconds(20);     
-
-    flashRED();  
-    DELAY_milliseconds(20);        
-    
-    
-    //PWM4_LoadDutyValue(160); //GREEN 
-    //DELAY_milliseconds(1000);    
-    /*
-    for(i = 1; i < 12; i++){
-        EPWM1_LoadDutyValue(((i*197)%8)*5); //BLUE
-        EPWM2_LoadDutyValue(((i*391)%8)*10+80); //RED
-        PWM4_LoadDutyValue(((i*357)%3)*10); //GREEN 
-        
-        DELAY_milliseconds(((i*2975)%57) + 80);
-        
-        lightsOff();
-        
-        DELAY_milliseconds(((i*2975)%89) + 120);
-    }
-     */
-    
-    lightsOff();
-    
-    //for (i=10;i>0;i--)
-    //{
-    //    EPWM2_LoadDutyValue(i); //R  
-    //    DELAY_milliseconds(40);
-    //}
-    //DELAY_milliseconds(200);
-    
+void crucio() {
+    printf("\n\r CRUCIO \n\r");
+    //Turn on green glow
+    EPWM1_LoadDutyValue(0); //B
+    EPWM2_LoadDutyValue(50); //R
+    PWM4_LoadDutyValue(0); //G
+    DELAY_milliseconds(300);
+    EPWM1_LoadDutyValue(0); //B
+    EPWM2_LoadDutyValue(100); //R
+    PWM4_LoadDutyValue(0); //G
+    DELAY_milliseconds(300);
+    EPWM1_LoadDutyValue(20); //B
+    EPWM2_LoadDutyValue(50); //R
+    PWM4_LoadDutyValue(0); //G
+    DELAY_milliseconds(300);
+    EPWM1_LoadDutyValue(50); //B
+    EPWM2_LoadDutyValue(100); //R
+    PWM4_LoadDutyValue(0); //G
+    DELAY_milliseconds(300);
+    EPWM1_LoadDutyValue(0); //B
+    EPWM2_LoadDutyValue(160); //R
+    PWM4_LoadDutyValue(0); //G
+    DELAY_milliseconds(2500);
+    EPWM1_LoadDutyValue(0); //B
+    EPWM2_LoadDutyValue(10); //R
+    PWM4_LoadDutyValue(0); //G
 }
 
 /*
@@ -311,11 +191,7 @@ void main(void)
     // initialize the device
     SYSTEM_Initialize();
 
-    //Handle interrupts
-    //INT_SetInterruptHandler(WakeUpInterrupt); //Set Weakup Interrupt from accelerometer handler   
-    IOCBF7_SetInterruptHandler(ButtonInterrupt); //Set Button Interrupt handler
-    //TMR4_SetInterruptHandler(TimerInterrupt); //Set Timer interrupt handler
-    
+    /* **************** INTERRUPT WORKFLOW **************** */
     // When using interrupts, you need to set the Global and Peripheral Interrupt Enable bits
     // Use the following macros to:
 
@@ -330,278 +206,290 @@ void main(void)
 
     // Disable the Peripheral Interrupts
     //INTERRUPT_PeripheralInterruptDisable();
+    /* **************** INTERRUPT WORKFLOW **************** */
 
-    //Turn OFF all the LEDs
-    EPWM1_LoadDutyValue(0);
-    EPWM2_LoadDutyValue(0);
-    PWM4_LoadDutyValue(0);
+    printf("\n\r Starting ... \n\r"); 
+    //RESET LEDS
+    EPWM1_LoadDutyValue(0); //BLUE
+    EPWM2_LoadDutyValue(0); //RED
+    PWM4_LoadDutyValue(0); //GREEN 
+    printf("\n\r 1 ... \n\r");
     
-    uint8_t data;
-    data = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x0F);
+    /*EPWM2_LoadDutyValue(100); //RED
+    DELAY_milliseconds(1000);            
+    EPWM2_LoadDutyValue(0); //RED
+    PWM4_LoadDutyValue(100); //GREEN 
+    DELAY_milliseconds(1000);            
+    PWM4_LoadDutyValue(0); //GREEN     
+    EPWM1_LoadDutyValue(100); //BLUE
+    DELAY_milliseconds(1000);        
+    EPWM1_LoadDutyValue(0); //BLUE */
+    
+    /*uint8_t initialization_data;
+    data = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, KXTJ3_WHO_AM_I);
     
     if(data == 0x35)
         PWM4_LoadDutyValue(160); //green
     else
         EPWM2_LoadDutyValue(160); //red
-    //DELAY_milliseconds(500);
+    DELAY_milliseconds(1000);*/
     
-    //initialize accelerometer
-    //this still needs to be adjusted, this code doesnt follow the recommended start up sequence
-    // read more here: https://kionixfs.azureedge.net/en/document/TN017-Power-On-Procedure.pdf
+    
+    printf("\n\r 2 ... \n\r");
+    
+    //Initialize accelerometer
     I2C1_Write1ByteRegister(KXTJ3_I2C_ADDR, 0x1D, 0b10000000); // reset acceletometer
     DELAY_milliseconds(1000); //wait until the reset sequence is finished
     
-    //set registers for what we need to test
+    printf("\n\r 3 ... \n\r");
+    
+    //Set registers for what we need to test
     I2C1_Write1ByteRegister(KXTJ3_I2C_ADDR, 0x1E, 0b00101000);
     I2C1_Write1ByteRegister(KXTJ3_I2C_ADDR, 0x1F, 0b10111111);    
     I2C1_Write1ByteRegister(KXTJ3_I2C_ADDR, 0x1B, 0b00000000);    
-    I2C1_Write1ByteRegister(KXTJ3_I2C_ADDR, 0x1B, 0b00000010);
-    I2C1_Write1ByteRegister(KXTJ3_I2C_ADDR, 0x1B, 0b10000010); 
+    //I2C1_Write1ByteRegister(KXTJ3_I2C_ADDR, 0x1B, 0b00000010);
+    I2C1_Write1ByteRegister(KXTJ3_I2C_ADDR, 0x1B, 0b10000010);
+    //I2C1_Write1ByteRegister(KXTJ3_I2C_ADDR, 0x1B, 0b10000000);
     
-    data = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x1B); //read this register to clear interrupts
+    //initialization_data = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x1B); //read this register to clear interrupts
     
-    //TMR4_StartTimer(); for future use  
+    //RESET LEDS
+    EPWM1_LoadDutyValue(0); //BLUE
+    EPWM2_LoadDutyValue(0); //RED
+    PWM4_LoadDutyValue(0); //GREEN
     
-    int8_t data_x = 0;
-    int8_t data_y = 0;
-    int8_t data_z = 0;
+    printf("\n\r 4 ... \n\r");
     
-    int8_t max_data_x = 0;
-    int8_t max_data_y = 0;
-    int8_t max_data_z = 0;
+    int8_t discrete_counter = 0; //Spell time window counter
+
+    int8_t axis[3];
+    int8_t prev_axis[3];
     
-    int8_t max_data_x_dir = 0;
-    int8_t max_data_y_dir = 0;
-    int8_t max_data_z_dir = 0;
+    prev_axis[X] = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x07);
+    prev_axis[Y] = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x09);
+    prev_axis[Z] = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x0B);
     
-    int8_t previous_data_x = 0;
-    int8_t previous_data_y = 0;
-    int8_t previous_data_z = 0;
+    //Spell movements buffer - 0 index = newest, 3 index = oldest
+    char spell_movements[4] = {'N', 'N', 'N', 'N'};
+ 
+    char casting_state; //Current state of state machine
     
-    int8_t timer = 0;
     
-    //EUSART_Write(0x30);
-    //printf("\n\r Hello \n\r");
+    if (prev_axis[Z] <= -50) {
+        //If the wand is upside down, enter debug mode
+        
+        casting_state = 'D';
+        
+        EPWM2_LoadDutyValue(100); //RED ON
+        DELAY_milliseconds(1000); //1s
+        EPWM2_LoadDutyValue(0); //RED OFF
+        PWM4_LoadDutyValue(100); //GREEN ON
+        DELAY_milliseconds(1000); //1s
+        PWM4_LoadDutyValue(0); //GREEN OFF
+        EPWM1_LoadDutyValue(100); //BLUE ON
+        DELAY_milliseconds(1000); //1s
+        EPWM1_LoadDutyValue(0); //BLUE OFF
+    }
+    else {
+        //If the wand is in normal orientation, enter spell mode
+        casting_state = 'S';
+    }
+        
     
+    
+    printf("\n\r Running ... \n\r");
     while (1)
     {
-        //test code - turns on different LED color when PCB is oriented different ways
-       
+        if (discrete_counter == 0) { //If discrete time window is active
+            //Get accelerometer axis
+            axis[X] = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x07);
+            axis[Y] = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x09);
+            axis[Z] = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x0B);
         
-        //EPWM1_LoadDutyValue(0);
-        //EPWM2_LoadDutyValue(0);
-        //PWM4_LoadDutyValue(0);
-        
-        max_data_x = 0;
-        max_data_y = 0;
-        max_data_z = 0;
-        max_data_x_dir = 1;
-        max_data_y_dir = 1;
-        max_data_z_dir = 1;
-        
-        int8_t i;
-        //for (i=0;i<75;i++)
-        //{
-           
-            data_x = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x07);
-            data_y = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x09);
-            data_z = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x0B);
-            
-            //printf("%04d %04d %04d \n\r", data_x, data_y, data_z);
-        /*    if(mathAbs(data_x-previous_data_x) > max_data_x){
-                max_data_x = mathAbs(data_x-previous_data_x);
-                max_data_x_dir = mathSign(data_x-previous_data_x);
-            }
-            if(mathAbs(data_y-previous_data_y) > max_data_y){
-                max_data_y = mathAbs(data_y-previous_data_y);
-                max_data_y_dir = mathSign(data_y-previous_data_y);
-            }
-            if(mathAbs(data_z-previous_data_z) > max_data_z){
-                max_data_z = mathAbs(data_z-previous_data_z);
-                max_data_z_dir = mathSign(data_z-previous_data_z);
-            }
-            DELAY_milliseconds(2);
-        }*/
-        
-        /*if (mathAbs(data_x-previous_data_x) > 5 && mathAbs(data_x-previous_data_x) > mathAbs(data_z-previous_data_z) && mathAbs(data_x-previous_data_x) > mathAbs(data_y-previous_data_y)){
-            EPWM1_LoadDutyValue(200);
-            EPWM2_LoadDutyValue(0);
-            PWM4_LoadDutyValue(0);
-            DELAY_milliseconds(200);
-        }else if (mathAbs(data_y-previous_data_y) > 5 && mathAbs(data_y-previous_data_y) > mathAbs(data_x-previous_data_x) && mathAbs(data_y-previous_data_y) > mathAbs(data_z-previous_data_z)){
-            EPWM1_LoadDutyValue(0);
-            EPWM2_LoadDutyValue(200);
-            PWM4_LoadDutyValue(0);
-            DELAY_milliseconds(200);
-        }else if (mathAbs(data_z-previous_data_z) > 5 && mathAbs(data_z-previous_data_z) > mathAbs(data_x-previous_data_x) && mathAbs(data_z-previous_data_z) > mathAbs(data_y-previous_data_y)){
-            EPWM1_LoadDutyValue(0);
-            EPWM2_LoadDutyValue(0);
-            PWM4_LoadDutyValue(200);
-            DELAY_milliseconds(200);
-        }*/
-        
-        //ORIENTATION CHECK
-        if (mathAbs(data_x) > mathAbs(data_y) + mathAbs(data_z)){
-            EPWM1_LoadDutyValue(0); //1
-            EPWM2_LoadDutyValue(0);
-            PWM4_LoadDutyValue(0);
-            DELAY_milliseconds(100);
-            if(part < 4 && moves[part-1] != 1){
-                moves[part] = 1;
-                part++;
-            }
-        }else if (mathAbs(data_y) > mathAbs(data_x) + mathAbs(data_z)){
-            EPWM1_LoadDutyValue(0);
-            EPWM2_LoadDutyValue(0); //Red, so reset moves
-            PWM4_LoadDutyValue(0);
-            DELAY_milliseconds(100);
-            if(part < 4 && moves[part-1] != 2){
-                moves[part] = 2;
-                part++;  
-                timer = 0;
-            }
-           
-            if(moves[1] == 2 && moves[2] == 1 && moves[3] == 2){
-                sparks();
-                moves[1] = 0; moves[2] = 0; moves[3] = 0; part = 1;
-                EPWM1_LoadDutyValue(0);
-                EPWM2_LoadDutyValue(0);
-                PWM4_LoadDutyValue(0);
-                DELAY_milliseconds(500);
-            }
-            
-            timer++;
-            if(timer > 3){
-               moves[0] = 0; moves[1] = 0; moves[2] = 0; moves[3] = 0; part = 1; 
-               timer = 0;
-               //SLEEP();
-            }
-        }else if (mathAbs(data_z) > mathAbs(data_y) + mathAbs(data_x)){
-            EPWM1_LoadDutyValue(0);
-            EPWM2_LoadDutyValue(0);
-            PWM4_LoadDutyValue(0); //1
-           
-            DELAY_milliseconds(100);
-            if(part < 4 && moves[part-1] != 3){
-                moves[part] = 3;
-                part++;   
-            }else if(moves[part-1] == 3){
-                if(moves[1] == 2 && moves[2] == 3){
-                    lumos();
-                    moves[1] = 0; moves[2] = 0; part = 1;
-                    EPWM1_LoadDutyValue(0);
-                    EPWM2_LoadDutyValue(0);
-                    PWM4_LoadDutyValue(0);
-                    DELAY_milliseconds(500);
-                }
-            }
-            //if(part == 3){
-                if(moves[1] == 2 && moves[2] == 1 && moves[3] == 3){
-                    patronus();
-                    moves[1] = 0; moves[2] = 0; moves[3] = 0; part = 1;
-                    EPWM1_LoadDutyValue(0);
-                    EPWM2_LoadDutyValue(0);
-                    PWM4_LoadDutyValue(0);
-                    DELAY_milliseconds(500);
-                }
-            //}
-            timer = 0;
+            //printf("%d %d %d \n\r", axis[X], axis[Y], axis[Z]);
+
+            //Shift spell movements buffer, Add new movement to buffer
+            spell_movements[3] = spell_movements[2];
+            spell_movements[2] = spell_movements[1];
+            spell_movements[1] = spell_movements[0];
+            spell_movements[0] = detectMovementDirection(axis, prev_axis);
         }
         
-        /*if(max_data_x + max_data_y + max_data_z < 25){
-            EPWM1_LoadDutyValue(0);
-            EPWM2_LoadDutyValue(0);
-            PWM4_LoadDutyValue(0);
-            //DELAY_milliseconds(50);
-            moves[0] = 0; moves[1] = 0; moves[2] = 0; moves[3] = 0; part = 1;
-        }else if(max_data_x > max_data_y && max_data_x > max_data_z){
-            EPWM1_LoadDutyValue(3); //B
-            EPWM2_LoadDutyValue(0); //R
-            PWM4_LoadDutyValue(0); //G
-            if(part < 4 && moves[part-1] != 1){
-                moves[part] = 1;
-                part++;   
+        //Register current axis data as previous data for next step
+        prev_axis[X] = axis[X];
+        prev_axis[Y] = axis[Y];
+        prev_axis[Z] = axis[Z];
+        
+        //Debug spell movements
+        printf("%c %c %c %c \n\r", spell_movements[0], spell_movements[1], spell_movements[2], spell_movements[3]);
+        
+        //START STATE MACHINE
+        if (casting_state == 'D') {
+            //DEBUG STATE, NO SUCCESSOR NODES
+            
+            //Change RGB color based on wand orientation
+            if (axis[X] > 0) {
+                EPWM1_LoadDutyValue(axis[X]);
             }
-            //DELAY_milliseconds(20);
-        }else if(max_data_y > max_data_x && max_data_y > max_data_z){
-            EPWM1_LoadDutyValue(0);
-            EPWM2_LoadDutyValue(3);
-            PWM4_LoadDutyValue(0);
-            if(part < 4 && moves[part-1] != 2){
-                moves[part] = 2;
-                part++;   
+            else {
+                EPWM1_LoadDutyValue(axis[X] * (-1));
             }
-            //DELAY_milliseconds(20);
-        }else if(max_data_z > max_data_y && max_data_z > max_data_x){
-            EPWM1_LoadDutyValue(0);
-            EPWM2_LoadDutyValue(0);
-            PWM4_LoadDutyValue(3);
-            if(part < 4 && moves[part-1] != 3){
-                moves[part] = 3;
-                part++;   
+
+            if (axis[Y] > 0) {
+                EPWM2_LoadDutyValue(axis[Y]);
             }
-            //DELAY_milliseconds(20);
-        }*/
-        /*
-        if(moves[1] == 1 && moves[2] == 3 && moves[3] == 1){
-            patronus();
-            moves[0] = 0; moves[1] = 0; moves[2] = 0; moves[3] = 0; part = 1;
+            else {
+                EPWM2_LoadDutyValue(axis[Y] * (-1));
+            }
+
+            if (axis[Z] > 0) {
+                PWM4_LoadDutyValue(axis[Z]);
+            }
+            else {
+                PWM4_LoadDutyValue(axis[Z] * (-1));
+            }
+            
         }
-         * */
+        if (casting_state == 'S') {
+            //STARTING POSITION
+            //Detect dark magic state change
+            if ((axis[Z] <= -60) && 
+               (spell_movements[0] == 'X') && (spell_movements[1] == 'X') && (spell_movements[2] == 'X') && (spell_movements[3] == 'X')) {
+                //Change state to dark magic starting state
+                dark_magic_enter();
+                casting_state = 'M';
+                
+                //Reset current spell movements buffer
+                spell_movements[0] = 'N';
+                spell_movements[1] = 'N';
+                spell_movements[2] = 'N';
+                spell_movements[3] = 'N';
+            }
 
-        /*if (data_y > 0)
-            EPWM2_LoadDutyValue(data_y);
-        else
-            EPWM2_LoadDutyValue(data_y * (-1));
-        
-        if (data_z > 0)
-            PWM4_LoadDutyValue(data_z);
-        else
-            PWM4_LoadDutyValue(data_z * (-1));*/
+            //Detect lumos casting
+            else if ((((spell_movements[0] == 'U') || (spell_movements[1] == 'U')) && ((spell_movements[2] == 'D') || (spell_movements[3] == 'D')))
+               && (axis[Y] <= 35)) {
+                //Cast lumos and enter lumos state
+                lumos();
+                casting_state = 'L';
 
-        previous_data_x = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x07);
-        previous_data_y = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x09);
-        previous_data_z = I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x0B);
+                //Reset current spell movements buffer
+                spell_movements[0] = 'N';
+                spell_movements[1] = 'N';
+                spell_movements[2] = 'N';
+                spell_movements[3] = 'N';
+            }
+            
+            //Detect expecto patronum casting
+            else if ((((spell_movements[0] == 'X') && (spell_movements[1] == 'X')) && ((spell_movements[2] == 'X') && (spell_movements[3] == 'X')))
+               && (axis[Y] >= 62)) {
+                //Cast expecto_patronum, stay in white magic state
+                expecto_patronum();
+                casting_state = 'S';
+
+                //Reset current spell movements buffer
+                spell_movements[0] = 'N';
+                spell_movements[1] = 'N';
+                spell_movements[2] = 'N';
+                spell_movements[3] = 'N';
+            }
+            
+            
+        }
+        else if (casting_state == 'L') {
+            //Wait for nox condition inside lumos state
+            
+            if ((((spell_movements[0] == 'L') || (spell_movements[1] == 'L')) && 
+               ((spell_movements[2] == 'R') || (spell_movements[3] == 'R'))) && 
+               (abs(axis[X]) >= 40)) {
+
+                nox();
+                casting_state = 'S';
+                
+                //Reset current spell movements buffer
+                spell_movements[0] = 'N';
+                spell_movements[1] = 'N';
+                spell_movements[2] = 'N';
+                spell_movements[3] = 'N';
+            }
+        }
+        else if (casting_state == 'M') {
+            //Wait for dark spell or white magic condition
+            
+             //Detect white magic state change
+            if ((axis[Z] >= 60) && 
+               (spell_movements[0] == 'X') && (spell_movements[1] == 'X') && (spell_movements[2] == 'X') && (spell_movements[3] == 'X')) {
+                //Change state to white magic starting state, use nox to reset LED
+                nox();
+                casting_state = 'S';
+                
+                //Reset current spell movements buffer
+                spell_movements[0] = 'N';
+                spell_movements[1] = 'N';
+                spell_movements[2] = 'N';
+                spell_movements[3] = 'N';
+            }
+            
+            //Detect avada kedavra
+            else if ((((spell_movements[0] == 'L') || (spell_movements[1] == 'L')) && ((spell_movements[2] == 'D') || (spell_movements[3] == 'D')))
+               && (axis[Y] <= 35)) {
+                //Cast avada kedavra
+                avada_kedavra();
+                casting_state = 'M';
+
+                //Reset current spell movements buffer
+                spell_movements[0] = 'N';
+                spell_movements[1] = 'N';
+                spell_movements[2] = 'N';
+                spell_movements[3] = 'N';
+            }
+            
+            //Detect dark magic transition state
+            else if ((((spell_movements[0] == 'X') && (spell_movements[1] == 'X')) && ((spell_movements[2] == 'X') && (spell_movements[3] == 'X')))
+               && (axis[Y] <= -60)) {
+                casting_state = 'T';
+
+                //Reset current spell movements buffer
+                spell_movements[0] = 'N';
+                spell_movements[1] = 'N';
+                spell_movements[2] = 'N';
+                spell_movements[3] = 'N';
+            }
+
+        }
+        else if (casting_state == 'T') {
+            //Wait for dark spell
+            
+             //Detect crucio
+            if ((axis[Y] >= -5) && 
+               (spell_movements[0] == 'X') && (spell_movements[1] == 'X') && (spell_movements[2] == 'X') && (spell_movements[3] == 'X')) {
+                //Change state to white magic starting state, use nox to reset LED
+                crucio();
+                casting_state = 'M';
+                
+                //Reset current spell movements buffer
+                spell_movements[0] = 'N';
+                spell_movements[1] = 'N';
+                spell_movements[2] = 'N';
+                spell_movements[3] = 'N';
+            }
+        }
         
-        //DELAY_milliseconds(10);
+        discrete_counter++;
+        //printf("%d \n\r n\nr", discrete_counter);
+        if (discrete_counter >= 8) {
+            //printf("%d \n\r n\nr", i);
+            
+            /*spell_movements[0] = 'X';
+            spell_movements[1] = 'X';
+            spell_movements[2] = 'X';
+            spell_movements[3] = 'X';*/
+            
+            discrete_counter = 0;
+        }
         
     }
 }
-
-//Wakeup Interrupt handler
-void WakeUpInterrupt(void){
-    //when accelerometer detects a movement, wake up the MCU
-    
-    EPWM1_LoadDutyValue(10);
-    EPWM2_LoadDutyValue(10); //Red, so reset moves
-    PWM4_LoadDutyValue(10);
-    
-    //if(I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x07)>500){
-    //   I2C1_Read1ByteRegister(KXTJ3_I2C_ADDR, 0x1B);   
-    //}else{
-    //    SLEEP();
-    //}
-}
-
-//Button Interrupt handler
-void ButtonInterrupt(void){
-    //moves[0] = 0; moves[1] = 0; moves[2] = 0; moves[3] = 0; part = 1;
-    //patronus(); //test a LED effect when button is pressed
-    /*
-    EPWM1_LoadDutyValue(11); //B
-    EPWM2_LoadDutyValue(120); //R
-    PWM4_LoadDutyValue(160);
-    DELAY_milliseconds(1000);*/
-    
-    sparks();
-}
-
-//Timer Interrupt handler
-void TimerInterrupt(void)
-{
-    TMR4_StopTimer(); //after timer reaches 0, stop it
-}
-
 /**
  End of File
 */

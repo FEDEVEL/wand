@@ -13,12 +13,12 @@
   @Description
     This source file provides implementations for driver APIs for PWM4.
     Generation Information :
-        Product Revision  :  PIC10 / PIC12 / PIC16 / PIC18 MCUs - 1.81.7
+        Product Revision  :  PIC10 / PIC12 / PIC16 / PIC18 MCUs - 1.81.8
         Device            :  PIC16LF1829
         Driver Version    :  2.01
     The generated drivers are tested against the following:
-        Compiler          :  XC8 2.31 and above
-         MPLAB 	          :  MPLAB X 5.45
+        Compiler          :  XC8 2.36 and above
+         MPLAB 	          :  MPLAB X 6.00
 */
 
 /*
@@ -55,7 +55,7 @@
   Section: Macro Declarations
 */
 
-#define PWM4_INITIALIZE_DUTY_VALUE    15
+#define PWM4_INITIALIZE_DUTY_VALUE    79
 
 /**
   Section: PWM Module APIs
@@ -68,8 +68,8 @@ void PWM4_Initialize(void)
 	// CCP4M PWM; DC4B 3; 
 	CCP4CON = 0x3C;    
 	
-	// CCPR4L 3; 
-	CCPR4L = 0x03;    
+	// CCPR4L 19; 
+	CCPR4L = 0x13;    
 	
 	// CCPR4H 0; 
 	CCPR4H = 0x00;    

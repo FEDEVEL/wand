@@ -13,12 +13,12 @@
   @Description
     This header file provides APIs for driver for .
     Generation Information :
-        Product Revision  :  PIC10 / PIC12 / PIC16 / PIC18 MCUs - 1.81.7
+        Product Revision  :  PIC10 / PIC12 / PIC16 / PIC18 MCUs - 1.81.8
         Device            :  PIC16LF1829
         Driver Version    :  2.11
     The generated drivers are tested against the following:
-        Compiler          :  XC8 2.31 and above
-        MPLAB 	          :  MPLAB X 5.45	
+        Compiler          :  XC8 2.36 and above
+        MPLAB 	          :  MPLAB X 6.00	
 */
 
 /*
@@ -77,6 +77,18 @@
 #define RB4_SetAnalogMode()         do { ANSELBbits.ANSB4 = 1; } while(0)
 #define RB4_SetDigitalMode()        do { ANSELBbits.ANSB4 = 0; } while(0)
 
+// get/set RB5 procedures
+#define RB5_SetHigh()            do { LATBbits.LATB5 = 1; } while(0)
+#define RB5_SetLow()             do { LATBbits.LATB5 = 0; } while(0)
+#define RB5_Toggle()             do { LATBbits.LATB5 = ~LATBbits.LATB5; } while(0)
+#define RB5_GetValue()              PORTBbits.RB5
+#define RB5_SetDigitalInput()    do { TRISBbits.TRISB5 = 1; } while(0)
+#define RB5_SetDigitalOutput()   do { TRISBbits.TRISB5 = 0; } while(0)
+#define RB5_SetPullup()             do { WPUBbits.WPUB5 = 1; } while(0)
+#define RB5_ResetPullup()           do { WPUBbits.WPUB5 = 0; } while(0)
+#define RB5_SetAnalogMode()         do { ANSELBbits.ANSB5 = 1; } while(0)
+#define RB5_SetDigitalMode()        do { ANSELBbits.ANSB5 = 0; } while(0)
+
 // get/set RB6 procedures
 #define RB6_SetHigh()            do { LATBbits.LATB6 = 1; } while(0)
 #define RB6_SetLow()             do { LATBbits.LATB6 = 0; } while(0)
@@ -86,20 +98,6 @@
 #define RB6_SetDigitalOutput()   do { TRISBbits.TRISB6 = 0; } while(0)
 #define RB6_SetPullup()             do { WPUBbits.WPUB6 = 1; } while(0)
 #define RB6_ResetPullup()           do { WPUBbits.WPUB6 = 0; } while(0)
-
-// get/set IO_RB7 aliases
-#define IO_RB7_TRIS                 TRISBbits.TRISB7
-#define IO_RB7_LAT                  LATBbits.LATB7
-#define IO_RB7_PORT                 PORTBbits.RB7
-#define IO_RB7_WPU                  WPUBbits.WPUB7
-#define IO_RB7_SetHigh()            do { LATBbits.LATB7 = 1; } while(0)
-#define IO_RB7_SetLow()             do { LATBbits.LATB7 = 0; } while(0)
-#define IO_RB7_Toggle()             do { LATBbits.LATB7 = ~LATBbits.LATB7; } while(0)
-#define IO_RB7_GetValue()           PORTBbits.RB7
-#define IO_RB7_SetDigitalInput()    do { TRISBbits.TRISB7 = 1; } while(0)
-#define IO_RB7_SetDigitalOutput()   do { TRISBbits.TRISB7 = 0; } while(0)
-#define IO_RB7_SetPullup()          do { WPUBbits.WPUB7 = 1; } while(0)
-#define IO_RB7_ResetPullup()        do { WPUBbits.WPUB7 = 0; } while(0)
 
 // get/set RC3 procedures
 #define RC3_SetHigh()            do { LATCbits.LATC3 = 1; } while(0)
@@ -112,6 +110,16 @@
 #define RC3_ResetPullup()           do { WPUCbits.WPUC3 = 0; } while(0)
 #define RC3_SetAnalogMode()         do { ANSELCbits.ANSC3 = 1; } while(0)
 #define RC3_SetDigitalMode()        do { ANSELCbits.ANSC3 = 0; } while(0)
+
+// get/set RC4 procedures
+#define RC4_SetHigh()            do { LATCbits.LATC4 = 1; } while(0)
+#define RC4_SetLow()             do { LATCbits.LATC4 = 0; } while(0)
+#define RC4_Toggle()             do { LATCbits.LATC4 = ~LATCbits.LATC4; } while(0)
+#define RC4_GetValue()              PORTCbits.RC4
+#define RC4_SetDigitalInput()    do { TRISCbits.TRISC4 = 1; } while(0)
+#define RC4_SetDigitalOutput()   do { TRISCbits.TRISC4 = 0; } while(0)
+#define RC4_SetPullup()             do { WPUCbits.WPUC4 = 1; } while(0)
+#define RC4_ResetPullup()           do { WPUCbits.WPUC4 = 0; } while(0)
 
 // get/set RC5 procedures
 #define RC5_SetHigh()            do { LATCbits.LATC5 = 1; } while(0)
@@ -158,90 +166,6 @@ void PIN_MANAGER_Initialize (void);
     PIN_MANAGER_IOC();
  */
 void PIN_MANAGER_IOC(void);
-
-
-/**
- * @Param
-    none
- * @Returns
-    none
- * @Description
-    Interrupt on Change Handler for the IOCBF7 pin functionality
- * @Example
-    IOCBF7_ISR();
- */
-void IOCBF7_ISR(void);
-
-/**
-  @Summary
-    Interrupt Handler Setter for IOCBF7 pin interrupt-on-change functionality
-
-  @Description
-    Allows selecting an interrupt handler for IOCBF7 at application runtime
-    
-  @Preconditions
-    Pin Manager intializer called
-
-  @Returns
-    None.
-
-  @Param
-    InterruptHandler function pointer.
-
-  @Example
-    PIN_MANAGER_Initialize();
-    IOCBF7_SetInterruptHandler(MyInterruptHandler);
-
-*/
-void IOCBF7_SetInterruptHandler(void (* InterruptHandler)(void));
-
-/**
-  @Summary
-    Dynamic Interrupt Handler for IOCBF7 pin
-
-  @Description
-    This is a dynamic interrupt handler to be used together with the IOCBF7_SetInterruptHandler() method.
-    This handler is called every time the IOCBF7 ISR is executed and allows any function to be registered at runtime.
-    
-  @Preconditions
-    Pin Manager intializer called
-
-  @Returns
-    None.
-
-  @Param
-    None.
-
-  @Example
-    PIN_MANAGER_Initialize();
-    IOCBF7_SetInterruptHandler(IOCBF7_InterruptHandler);
-
-*/
-extern void (*IOCBF7_InterruptHandler)(void);
-
-/**
-  @Summary
-    Default Interrupt Handler for IOCBF7 pin
-
-  @Description
-    This is a predefined interrupt handler to be used together with the IOCBF7_SetInterruptHandler() method.
-    This handler is called every time the IOCBF7 ISR is executed. 
-    
-  @Preconditions
-    Pin Manager intializer called
-
-  @Returns
-    None.
-
-  @Param
-    None.
-
-  @Example
-    PIN_MANAGER_Initialize();
-    IOCBF7_SetInterruptHandler(IOCBF7_DefaultInterruptHandler);
-
-*/
-void IOCBF7_DefaultInterruptHandler(void);
 
 
 
